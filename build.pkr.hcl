@@ -13,7 +13,7 @@ source "vmware-iso" "base" {
   remote_port      = 22
   remote_datastore = "${var.datastore}"
 
-  shutdown_command = "echo 'packer' | sudo -S -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
+  shutdown_command = "echo 'packer' | sudo -S -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
   ssh_username     = "packer"
   ssh_password     = "packer"
   ssh_timeout      = "10m"
