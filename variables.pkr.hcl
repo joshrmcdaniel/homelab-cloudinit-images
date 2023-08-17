@@ -12,3 +12,8 @@ variable "esxi_password" {
   description = "Password of the authenticating user to ESXi."
   type        = string
 }
+
+variable "datastore" {
+  description = "Datastore to output the resulting build to."
+  type        = string
+}

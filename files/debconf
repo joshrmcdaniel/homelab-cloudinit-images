@@ -54,18 +54,17 @@ d-i base-installer/kernel/image string linux-image-amd64
 
 # B.4.9. Apt setup
 
-d-i apt-setup/non-free-firmware boolean false
 d-i apt-setup/non-free boolean true
 d-i apt-setup/contrib boolean true
 d-i apt-setup/disable-cdrom-entries boolean true
 d-i apt-setup/services-select multiselect security, updates, contrib, non-free
-d-i apt-setup/security_host string security.debian.org
+# d-i apt-setup/security_host string security.debian.org
 d-i debian-installer/allow_unauthenticated boolean false
 
 # B.4.10. Package selection
 
 tasksel tasksel/first multiselect standard, ssh-server
-d-i pkgsel/include string openssh-server sudo curl wget open-vm-tools
+d-i pkgsel/include string openssh-server sudo curl wget
 d-i pkgsel/upgrade select full-upgrade
 popularity-contest popularity-contest/participate boolean false
 
@@ -78,3 +77,13 @@ d-i grub-installer/bootdev string /dev/sda
 
 d-i finish-install/reboot_in_progress string
 d-i cdrom-detect/eject boolean true
+
+d-i preseed/late_command string \
+in-target apt-get -y purge installation-report; \
+\
+>>/target/etc/apt/sources.list echo deb http://ftp.us.debian.org/debian bookworm main contrib non-free; \
+>>/target/etc/apt/sources.list echo deb http://deb.debian.org/debian-security/ bookworm-security main; \
+>>/target/etc/apt/sources.list echo deb http://ftp.us.debian.org/debian bookworm-updates main; \
+in-target apt-get update; \
+in-target apt-get install -y open-vm-tools; \
+in-target apt dist-upgrade -y;
