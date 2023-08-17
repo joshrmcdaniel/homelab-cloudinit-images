@@ -21,5 +21,16 @@ locals {
         "grub-installer/bootdev=/dev/sda<enter>"
       ]
     }
+    "rockylinux9-64" = {
+      guest_os_type = "rhel9-64"
+      iso_url       = "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.2-x86_64-minimal.iso"
+      iso_checksum  = "sha256:06505828e8d5d052b477af5ce62e50b938021f5c28142a327d4d5c075f0670dc"
+      boot_cmd = [
+        "<wait><up><tab>linux inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed<enter>"
+      ]
+      ks                      = "files/rockylinux9"
+      remote_output_directory = "rocky9"
+    }
   }
+  run_as_root = "echo 'packer' | {{.Vars}} sudo -S -E sh -eux '{{.Path}}'"
 }

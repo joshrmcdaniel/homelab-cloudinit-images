@@ -13,7 +13,7 @@ source "vmware-iso" "base" {
   remote_port      = 22
   remote_datastore = "${var.datastore}"
 
-  shutdown_command = "echo 'packer' | sudo -S -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; /sbin/shutdown -hP now'"
+  shutdown_command = "echo 'packer' | sudo -S -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
   ssh_username     = "packer"
   ssh_password     = "packer"
   ssh_timeout      = "10m"
@@ -44,9 +44,21 @@ build {
   }
 
   provisioner "shell" {
-    execute_command = "echo 'packer' | {{.Vars}} sudo -S -E sh -eux '{{.Path}}'"
+    execute_command = local.run_as_root
+    only            = ["vmware-iso.debian12-64"]
+    inline          = ["apt install -y cloud-init"]
+  }
+  provisioner "shell" {
+    execute_command = local.run_as_root
+    only            = ["vmware-iso.rockylinux9-64"]
     inline = [
-      "apt install -y cloud-init",
+      "dnf install -y cloud-init"
+    ]
+  }
+
+  provisioner "shell" {
+    execute_command = local.run_as_root
+    inline = [
       "cloud-init clean",
       "cloud-init clean -l",
       <<-EOC
@@ -64,6 +76,5 @@ build {
       "systemctl enable cloud-config.service",
       "systemctl enable cloud-final.service",
     ]
-
   }
 }
