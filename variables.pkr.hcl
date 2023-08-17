@@ -1,5 +1,5 @@
 variable "esxi_host" {
-  description = "ESXi Host."
+  description = "FQDN of the ESXi Host."
   type        = string
 }
 
@@ -13,7 +13,24 @@ variable "esxi_password" {
   type        = string
 }
 
+variable "esxi_insecure" {
+  description = "Skip TLS verification on the ESXi host."
+  type        = bool
+  default     = true
+}
+
 variable "datastore" {
   description = "Datastore to output the resulting build to."
+  type        = string
+}
+
+variable "network" {
+  description = "Network type within ESXi"
+  type        = string
+  default     = "bridge"
+}
+
+variable "network_name" {
+  description = "Name of network to use"
   type        = string
 }

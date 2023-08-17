@@ -6,24 +6,24 @@ source "vmware-iso" "base" {
   disk_size = 5000
 
 
-  remote_host      = "${var.esxi_host}"
-  remote_username  = "${var.esxi_user}"
-  remote_password  = "${var.esxi_password}"
-  remote_type      = "esx5"
-  remote_port      = 22
-  remote_datastore = "${var.datastore}"
+  remote_host         = "${var.esxi_host}"
+  insecure_connection = var.esxi_insecure
+  remote_username     = "${var.esxi_user}"
+  remote_password     = "${var.esxi_password}"
+  remote_type         = "esx5"
+  remote_port         = 22
+  remote_datastore    = "${var.datastore}"
 
   shutdown_command = "echo 'packer' | sudo -S -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
   ssh_username     = "packer"
   ssh_password     = "packer"
   ssh_timeout      = "10m"
-  network          = "bridge"
-  network_name     = "packer"
+  network          = "${var.network}"
+  network_name     = "${var.network_name}"
 
-  vnc_over_websocket  = true
-  insecure_connection = true
-  skip_export         = true
-  skip_compaction     = true
+  vnc_over_websocket = true
+  skip_export        = true
+  skip_compaction    = true
 }
 
 build {
