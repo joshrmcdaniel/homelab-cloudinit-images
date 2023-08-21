@@ -64,9 +64,9 @@ build {
       <<-EOC
         cat <<EOF | tee /etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg
         disable_vmware_customization: false
-          datasource:
-            VMware:
-              vmware_cust_file_max_wait: 20
+        datasource:
+          VMware:
+            vmware_cust_file_max_wait: 20
         EOF
         EOC
       ,
