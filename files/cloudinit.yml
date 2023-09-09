@@ -1,0 +1,4 @@
+disable_vmware_customization: false
+datasource:
+  VMware:
+    vmware_cust_file_max_wait: 10

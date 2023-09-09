@@ -84,7 +84,9 @@ in-target apt-get -y purge installation-report; \
 >>/target/etc/apt/sources.list echo deb http://ftp.us.debian.org/debian bookworm main contrib non-free; \
 >>/target/etc/apt/sources.list echo deb http://deb.debian.org/debian-security/ bookworm-security main; \
 >>/target/etc/apt/sources.list echo deb http://ftp.us.debian.org/debian bookworm-updates main; \
-in-target echo "packer ALL=(ALL) NOPASSWD: ALL" >> /target/etc/sudoers.d/packer
+>>/target/etc/sudoers echo "#includedir /etc/sudoers.d"; \
+>>/target/etc/sudoers.d/packer echo 'packer ALL=(ALL) NOPASSWD: ALL'; \
+in-target chmod 440 '/etc/sudoers.d/packer'; \
 in-target apt-get update; \
 in-target apt-get install -y open-vm-tools; \
 in-target apt dist-upgrade -y;

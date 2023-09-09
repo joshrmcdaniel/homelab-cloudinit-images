@@ -1,8 +1,8 @@
 locals {
   builds = {
     debian12-64 = {
-      iso_url                 = "https://cdimage.debian.org/debian-cd/current/amd64/iso-dvd/debian-12.1.0-amd64-DVD-1.iso"
-      iso_checksum            = "sha256:9168ff53d789537db4f5233e7dfa5e860519c44b68132b70805218f842b00041"
+      iso_url                 = "https://mirror.accum.se/debian-cd/current/amd64/iso-cd/debian-12.1.0-amd64-netinst.iso"
+      iso_checksum            = "sha256:9f181ae12b25840a508786b1756c6352a0e58484998669288c4eec2ab16b8559"
       guest_os_type           = "debian11-64"
       remote_output_directory = "debian12"
       ks                      = "files/debconf"
@@ -32,5 +32,5 @@ locals {
       remote_output_directory = "rocky9"
     }
   }
-  run_as_root = "echo 'packer' | {{.Vars}} sudo -S -E sh -eux '{{.Path}}'"
+  run_as_root = "{{.Vars}} sudo -E sh -eux '{{.Path}}'"
 }

@@ -14,7 +14,7 @@ source "vmware-iso" "base" {
   remote_port         = 22
   remote_datastore    = "${var.datastore}"
 
-  shutdown_command = "echo 'packer' | sudo -S -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
+  shutdown_command = "sudo -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
   ssh_username     = "packer"
   ssh_password     = "packer"
   ssh_timeout      = "10m"
@@ -43,38 +43,13 @@ build {
     }
   }
 
-  provisioner "shell" {
-    execute_command = local.run_as_root
-    only            = ["vmware-iso.debian12-64"]
-    inline          = ["apt install -y cloud-init"]
-  }
-  provisioner "shell" {
-    execute_command = local.run_as_root
-    only            = ["vmware-iso.rockylinux9-64"]
-    inline = [
-      "dnf install -y cloud-init"
-    ]
+  provisioner "file" {
+    source = "./files/cloudinit.yml"
+    destination = "/tmp/99-vmware-guest-customization.cfg"
   }
 
   provisioner "shell" {
     execute_command = local.run_as_root
-    inline = [
-      "cloud-init clean",
-      "cloud-init clean -l",
-      <<-EOC
-        cat <<EOF | tee /etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg
-        disable_vmware_customization: false
-        datasource:
-          VMware:
-            vmware_cust_file_max_wait: 20
-        EOF
-        EOC
-      ,
-      "vmware-toolbox-cmd config set deployPkg enable-custom-scripts true",
-      "systemctl enable cloud-init-local.service",
-      "systemctl enable cloud-init.service",
-      "systemctl enable cloud-config.service",
-      "systemctl enable cloud-final.service",
-    ]
+    script = "./files/enable-cloudinit.sh"
   }
 }
