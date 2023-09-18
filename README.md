@@ -1,15 +1,18 @@
 # homelab-cloudinit-images
-Packer builds to create provisioned VMs with `open-vm-tools` and `cloud-init` configured. Resulting buils stored on the ESXi server.
+Packer builds to create golden images with `open-vm-tools` and `cloud-init` for ESXi. Resulting builds are stored on the ESXi server.
 
 Currently builds Debian 12 and Rocky Linux 9
+
+**Each build must be consecutive, with trivial changes you could parallel build (this relating to the network setup).**
 
 ## Requirements
 - ESXi (tested on 7U3n)
 - Packer
 - Ingress rules on the running machine for the kickstart/preseed file
+- Open adapter within ESXi to associate the build with
 
 ## Variables File Example
-``` hcl
+```hcl2
 esxi_host     = "my.exsi.host"
 esxi_user     = "myuser"
 esxi_password = "mypassword"
@@ -19,14 +22,32 @@ esxi_insecure = true
 disk_size     = 20
 ```
 
-
 ## Running
-Create `variables.pkrvars.hcl` in the containing directory with the [example above](#variables-file-example)
+- Create `variables.pkrvars.hcl` in the containing directory with the [example above](#variables-file-example)
+- Enable `TSM-SSH` on the ESXi instance and use credentials with permissions for SSH
+
+Run the following:
 ``` shell
 packer init .
-packer validate -var-file=your_vars.pkrvars.hcl .
-packer build -var-file=your_vars.pkrvars.hcl .
+packer validate -var-file=variables.pkrvars.hcl .
+packer build -var-file=variables.pkrvars.hcl -parallel-builds=1 .
 ```
+
+
+### Running on WSL2
+This will not work without a couple modifications. The port from the host machine will need to be bridge from Windows to WSL. This can be achieved with the following commands
+- `netsh interface portproxy add v4tov4 listenport=8312 listenaddress=0.0.0.0 connectport=8312 connectaddress=<wsl2 addr>`
+- `New-NetFirewallRule -DisplayName "Packer WSL2 Port Bridge" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8312`
+
+The port choice doesn't matter, just ensure it matches with the port configuration below
+
+Add the following variables to `variables.pkrvars.hcl`
+```hcl2
+http_host     = "<host ip>" # NOT THE WSL2 IP
+http_port_min = 8312
+http_port_max = 8312
+```
+Run Packer, and it will work as expected.
 
 ## Using in deployments
 The resulting build produces a single disk. If you prefer not re-running the build on every vm, copy the build to elsewhere for storage.
@@ -41,68 +62,27 @@ The encoding can be gzip+base64, or base64. That information is stored under the
 - `guestinfo.vendordata.encoding`
 
 ## Example
-If using terraform to manage ESXi resources, here is an example `vsphere_virtual_machine` resource to use the provided packer build. The example also uses a `vsphere_file` resource to automatically copy the file to the destination provided.
+If using terraform to manage ESXi resources, here is an example `vsphere_virtual_machine` resource to use the provided packer build. The example also uses a `vsphere_file` resource to automatically copy the file to the destination provided. This assumes the `remote_output_directory` (`base/`) is not changed
 
-### `vm.tf`
-```hcl2
-resource "vsphere_virtual_machine" "example" {
-  name               = "example"
-  resource_pool_id   = data.vsphere_resource_pool.this.id
-  host_system_id     = data.vsphere_host.this.id
-  datastore_id       = data.vsphere_datastore.this.id
-  num_cpus           = 2
-  memory             = 4096
-  memory_reservation = 4096
-  guest_id           = "debian11_64Guest"
-  memory_limit       = -1
-
-  network_interface {
-    network_id   = data.vsphere_network.this.id
-    adapter_type = "vmxnet3"
-  }
-  disk {
-    label        = "disk0"
-    attach       = true
-    path         = vsphere_file.debian_cloudinit.destination_file
-    datastore_id = data.vsphere_datastore.this.id
-  }
-
-  extra_config = {
-    "guestinfo.metadata"          = base64gzip(file("path/to/metadata.yaml"))
-    "guestinfo.metadata.encoding" = "gzip+base64"
-    "guestinfo.userdata"          = base64gzip(file("path/to/userdata.yaml"))
-    "guestinfo.userdata.encoding" = "gzip+base64"
-    "guestinfo.vendordata"          = base64gzip(file("path/to/userdata.yaml"))
-    "guestinfo.vendordata.encoding" = "gzip+base64"
-  }
-}
-
-resource "vsphere_file" "debian_cloudinit" {
-  source_datacenter  = data.vsphere_datacenter.this.name
-  datacenter         = data.vsphere_datacenter.this.name
-  source_datastore   = data.vsphere_datastore.this.name
-  datastore          = data.vsphere_datastore.this.name
-  source_file        = "path/to/output/disk.vmdk"
-  destination_file   = "path/to/vm/disk.vmdk"
-  create_directories = true
-}
-
-```
+See [`example/`](example/) folder for an example terraform setup with the below cloud-config.
 
 ### `metadata.yaml`
 ```yaml
-instance-id: example-instance
-hostname: example
-local-hostname: example
+instance-id: 555
+hostname: vm
+local-hostname: vm.example.com
 cloud_name: vmware
 platform: vmware
 ```
+
+### `vendordata.yaml`
+I don't know, I don't use it. [See here](https://cloudinit.readthedocs.io/en/23.2.2/explanation/vendordata.html) for info
 
 ### `userdata.yaml`
 ```yaml
 #cloud-config
 manage_etc_hosts: localhost
-# Add user and give sudo access
+
 users:
   - default
   - name: jeff
@@ -111,8 +91,8 @@ users:
     lock_passwd: true
     shell: /bin/bash
     ssh_authorized_keys:
-    - key1
-    - key2
+    - pubkey1
+    - pubkey2
 
 runcmd:
   - echo "Hi"
@@ -122,7 +102,13 @@ packages:
   - gcc
   - xorg
 ```
-Unless you know what you're doing, `#cloud-init` **needs to be** on the first line 
+
+**Unless you know what you're doing, `#cloud-config` needs to be on the first line**
+
 
 ## Further information
 See [here](https://developer.hashicorp.com/packer/plugins/builders/vmware/iso#vmware-builder-from-iso) for the official documentation on the `vmware-iso` plugin
+
+See [here](https://cloudinit.readthedocs.io/en/23.2.2) for cloud-init docs
+
+See [here](https://registry.terraform.io/providers/hashicorp/vsphere/latest/docs) for vSphere provider documentation

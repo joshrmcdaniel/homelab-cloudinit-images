@@ -34,3 +34,27 @@ variable "network_name" {
   description = "Name of network to use"
   type        = string
 }
+
+variable "disk_size" {
+  description = "Size of the VMDK in GB."
+  type        = number
+  default     = 20
+}
+
+variable "http_port_min" {
+  description = "Minimum port to use for the http server hosting the kickstart/preseed files."
+  type        = number
+  default     = 8000
+}
+
+variable "http_port_max" {
+  description = "Minimum port to use for the http server hosting the kickstart/preseed files."
+  type        = number
+  default     = 9000
+}
+
+variable "http_host" {
+  description = "IP/URL hosting the kickstart/preseed files."
+  type        = string
+  default     = "{{ .HTTPIP }}"
+}

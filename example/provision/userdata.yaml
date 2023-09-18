@@ -1,0 +1,21 @@
+#cloud-config
+manage_etc_hosts: localhost
+
+users:
+  - default
+  - name: jeff
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [ sudo, wheel ]
+    lock_passwd: true
+    shell: /bin/bash
+    ssh_authorized_keys:
+    - key1
+    - key2
+
+runcmd:
+  - echo "Hi"
+
+packages:
+  - make
+  - gcc
+  - xorg

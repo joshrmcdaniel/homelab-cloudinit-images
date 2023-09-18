@@ -11,7 +11,7 @@ locals {
         "/install.amd/vmlinuz ",
         "initrd=/install.amd/initrd.gz ",
         "auto=true quiet nointeract ",
-        "preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed ",
+        "preseed/url=http://${var.http_host}:{{ .HTTPPort }}/preseed ",
         "debconf/frontend=text ",
         "vga=788 ",
         "priority=critical ",
@@ -23,10 +23,10 @@ locals {
     }
     "rockylinux9-64" = {
       guest_os_type = "rhel9-64"
-      iso_url       = "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.2-x86_64-minimal.iso"
-      iso_checksum  = "sha256:06505828e8d5d052b477af5ce62e50b938021f5c28142a327d4d5c075f0670dc"
+      iso_url       = "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.2-x86_64-boot.iso"
+      iso_checksum  = "11e42da96a7b336de04e60d05e54a22999c4d7f3e92c19ebf31f9c71298f5b42"
       boot_cmd = [
-        "<wait><up><tab>linux inst.ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed<enter>"
+        "<wait><up><tab>linux inst.ks=http://${var.http_host}:{{ .HTTPPort }}/preseed<enter>"
       ]
       ks                      = "files/rockylinux9"
       remote_output_directory = "rocky9"

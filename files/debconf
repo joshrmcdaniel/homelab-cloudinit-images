@@ -3,6 +3,7 @@
 d-i debian-installer/locale string en_US
 d-i debian-installer/language string en
 d-i debian-installer/country string US
+d-i debian-installer/exit/poweroff boolean true
 d-i keyboard-configuration/xkb-keymap select us
 # B.4.2. Network configuration
 
@@ -64,7 +65,7 @@ d-i debian-installer/allow_unauthenticated boolean false
 # B.4.10. Package selection
 
 tasksel tasksel/first multiselect standard, ssh-server
-d-i pkgsel/include string openssh-server sudo curl wget
+d-i pkgsel/include string openssh-server sudo curl wget open-vm-tools cloud-init
 d-i pkgsel/upgrade select full-upgrade
 popularity-contest popularity-contest/participate boolean false
 
@@ -75,7 +76,7 @@ d-i grub-installer/bootdev string /dev/sda
 
 # B.4.12. Finishing up the installation
 
-d-i finish-install/reboot_in_progress string
+d-i finish-install/reboot_in_progress note
 d-i cdrom-detect/eject boolean true
 
 d-i preseed/late_command string \
@@ -84,9 +85,35 @@ in-target apt-get -y purge installation-report; \
 >>/target/etc/apt/sources.list echo deb http://ftp.us.debian.org/debian bookworm main contrib non-free; \
 >>/target/etc/apt/sources.list echo deb http://deb.debian.org/debian-security/ bookworm-security main; \
 >>/target/etc/apt/sources.list echo deb http://ftp.us.debian.org/debian bookworm-updates main; \
->>/target/etc/sudoers echo "#includedir /etc/sudoers.d"; \
->>/target/etc/sudoers.d/packer echo 'packer ALL=(ALL) NOPASSWD: ALL'; \
-in-target chmod 440 '/etc/sudoers.d/packer'; \
+in-target vmware-toolbox-cmd config set deployPkg enable-custom-scripts true; \
 in-target apt-get update; \
-in-target apt-get install -y open-vm-tools; \
-in-target apt dist-upgrade -y;
+in-target systemctl enable cloud-init cloud-config cloud-final vmtoolsd sshd; \
+in-target apt dist-upgrade -y; \
+in-target apt clean; \
+in-target userdel -rf packer; \
+in-target sed -i '/^#NAutoVTs=.*/NAutoVTs=0' /etc/systemd/logind.conf; \
+in-target find /var/log -type f -exec truncate --size=0 {} \;; \
+in-target truncate -s /etc/resolv.conf; \
+in-target /bin/sh -c  -- "[ ! grep -q growpart /etc/cloud/cloud.cfg ] && sed -i 's/ - resizefs/ - growpart\n - resizefs/' /etc/cloud/cloud.cfg"; \
+in-target rm -f /etc/systemd/system/default.target; \
+in-target ln -s /lib/systemd/system/multi-user.target /etc/systemd/system/default.target; \
+in-target rm -f /etc/udev/rules.d/70*; \
+in-target ln -s /dev/null /etc/udev/rules.d/80-net-name-slot.rules; \
+in-target rm /etc/hosts; \
+in-target rm -f /etc/network/interfaces; \
+in-target truncate -s 0 /etc/resolv.conf; \
+in-target truncate -s 0 /etc/machine-id; \
+in-target rm -f /var/lib/systemd/random-seed; \
+in-target rm -rf /tmp/* /var/tmp/*; \
+\
+>>/target/etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg echo "disable_vmware_customization: false"; \
+>>/target/etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg echo "datasource:"; \
+>>/target/etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg echo "  VMware:"; \
+>>/target/etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg echo "    vmware_cust_file_max_wait: 10"; \
+>>/target/etc/hosts echo "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4"; \
+>>/target/etc/hosts echo "::1         localhost localhost.localdomain localhost6 localhost6.localdomain6"; \
+>>/target/etc/network/interfaces echo "source /etc/network/interfaces.d/*"; \
+>>/target/etc/network/interfaces echo "auto lo"; \
+>>/target/etc/network/interfaces echo "iface lo inet loopback"; \
+>>/target/etc/network/interfaces echo "allow-hotplug eth0"; \
+>>/target/etc/network/interfaces echo "iface eth0 inet dhcp";

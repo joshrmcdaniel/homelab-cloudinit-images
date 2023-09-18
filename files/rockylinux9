@@ -1,54 +1,173 @@
-# https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_an_advanced_rhel_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user
-
-# Set the authentication options for the system
-auth --passalgo=sha512 --useshadow
-# License agreement
-eula --agreed
-# Use network installation
-url --url="https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/"
-repo --name="AppStream" --baseurl=https://download.rockylinux.org/pub/rocky/9/AppStream/x86_64/os/
-# Use text mode install
 text
-# Disable Initial Setup on first boot
+auth --passalgo=sha512 --useshadow
+eula --agreed
+url --url="https://download.rockylinux.org/pub/rocky/9.2/BaseOS/x86_64/os/"
+repo --name="AppStream" --baseurl=https://download.rockylinux.org/pub/rocky/9/AppStream/x86_64/os/
 firstboot --disable
-# Keyboard layout
 keyboard --vckeymap=us --xlayouts='us'
-# System language
 lang en_US.UTF-8
-# Network information
-network --bootproto=dhcp --device=link --activate
-network --hostname=rocky9.pkr.hcl
-# Root password
-rootpw $2b$10$INZSJ5B/np1u3f02P79wiectoCrHSoKlc6IX9CIsouGMv6/BxWq0G --iscrypted
-# Do not configure the X Window System
+network  --bootproto=dhcp --device=link --activate --onboot=on
+services --disabled="kdump,rhsmcertd" --enabled="NetworkManager,vmtoolsd,sshd,rsyslog,chronyd,cloud-init,cloud-init-local,cloud-config,cloud-final,rngd"
+rootpw epic # Changed in post
 skipx
-# System timezone
 timezone Etc/UTC
-# Add a user named packer
-user --groups=wheel --name=packer --password="packer" --gecos="packer"
-# System bootloader configuration
-bootloader --location=mbr --append="crashkernel=auto"
+bootloader --append="console=ttyS0,115200n8 no_timer_check crashkernel=auto net.ifnames=0" --location=mbr --timeout=1
+part /boot/efi --fstype="efi" --onpart=sda1
+part /boot --fstype="xfs" --label=boot --onpart=sda2
+part prepboot --fstype="prepboot" --onpart=sda3
+part biosboot --fstype="biosboot" --onpart=sda4
+part /         --size=8000 --fstype="xfs"    --mkfsoptions "-m bigtime=0,inobtcount=0" --grow --onpart=sda5
+
+%pre
 # Clear the Master Boot Record
-zerombr
-# Remove partitions
-clearpart --all --initlabel
-# Automatically create partitions using LVM
-autopart --type=lvm
-# Reboot after successful installation
-reboot
+dd if=/dev/zero of=/dev/sda bs=512 count=1
+# Create a new GPT partition table
+parted /dev/sda mklabel gpt
+# Create a partition for /boot/efi
+parted /dev/sda mkpart primary fat32 1MiB 100MiB
+parted /dev/sda set 1 boot on
+# Create a partition for /boot
+parted /dev/sda mkpart primary xfs 100MiB 1100MiB
+# Create a partition for prep
+parted /dev/sda mkpart primary 1100MiB 1104MiB
+# Create a partition for bios_grub
+parted /dev/sda mkpart primary 1104MiB 1105MiB
+# Create a partition for LVM
+parted /dev/sda mkpart primary xfs 1106MiB 10.7GB
+
+%end
 
 %packages --ignoremissing
-# dnf group info minimal-environment
+rocky-release
+dnf
+kernel
+yum
+nfs-utils
+dnf-utils
+drpm
+net-tools
+open-vm-tools
+sudo
+epel-release
+cloud-init
+virt-what
+cockpit-ws
+cockpit-system
+dracut-config-generic
+rng-tools
+curl
 @^minimal-environment
 # Exclude unnecessary firmwares
 -iwl*firmware
+-aic94xx-firmware
+-alsa-firmware
+-alsa-lib
+-alsa-tools-firmware
+-dracut-config-rescue
+-biosdevname
+-plymouth
+-iprutils
 %end
 
-%post --nochroot --logfile=/mnt/sysimage/root/ks-post.log
+%post --logfile=/root/ks-post.log --erroronfail --nochroot
+set -x
 # Disable quiet boot and splash screen
+
 sed --follow-symlinks -i "s/ rhgb quiet//" /mnt/sysimage/etc/default/grub
 sed --follow-symlinks -i "s/ rhgb quiet//" /mnt/sysimage/boot/grub2/grubenv
-dnf install -y open-vm-tools
-# Passwordless sudo for the user 'packer'
-echo "packer ALL=(ALL) NOPASSWD: ALL" >> /mnt/sysimage/etc/sudoers.d/packer
+
+# sed -i 's|^enabled=1|enabled=0|' /etc/yum/pluginconf.d/product-id.conf
+# sed -i 's|^enabled=1|enabled=0|' /etc/yum/pluginconf.d/subscription-manager.conf
+chroot /mnt/sysimage passwd -l root
+chroot /mnt/sysimage passwd -d root
+
+if [ "$(arch)" = "x86_64" ]; then
+  chroot /mnt/sysimage dnf install -y grub2-pc-modules grub2-pc || true
+  chroot /mnt/sysimage grub2-install --target=i386-pc /dev/sda
+fi
+
+chroot /mnt/sysimage dnf -C -y remove firewalld selinux* --setopt="clean_requirements_on_remove=1"
+chroot /mnt/sysimage dnf -C -y remove linux-firmware avahi\*
+
+chroot vmware-toolbox-cmd config set deployPkg enable-custom-scripts true
+chroot dnf clean all
+
+
+rm -f /mnt/sysimage/etc/systemd/system/default.target
+chroot /mnt/sysimage ln -s /lib/systemd/system/multi-user.target /etc/systemd/system/default.target
+rm -f /mnt/sysimage/etc/udev/rules.d/70*
+chroot /mnt/sysimage ln -s /dev/null /etc/udev/rules.d/80-net-name-slot.rules
+chroot /mnt/sysimage <<EOT
+tr -dc A-Za-z0-9 </dev/urandom | head -c 20 | passwd --stdin root
+EOT
+echo "Done with chroot"
+
+mkdir -p /mnt/sysimage/etc/tuned
+echo "virtual-guest" > /mnt/sysimage/etc/tuned/active_profile
+
+sed -i '/^#NAutoVTs=.*/ a\
+NAutoVTs=0' /mnt/sysimage/etc/systemd/logind.conf
+
+# Network
+truncate -s 0 /mnt/sysimage/etc/resolv.conf
+cat > /mnt/sysimage/etc/sysconfig/network << EOF
+NETWORKING=yes
+NOZEROCONF=yes
+EOF
+
+cat > /mnt/sysimage/etc/hosts << EOF
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+EOF
+
+rm -f /mnt/sysimage/etc/sysconfig/network-scripts/ifcfg-*
+cat > /mnt/sysimage/etc/sysconfig/network-scripts/ifcfg-eth1 << EOF
+DEVICE="eth1"
+BOOTPROTO="dhcp"
+BOOTPROTOv6="dhcp"
+ONBOOT="yes"
+TYPE="Ethernet"
+USERCTL="yes"
+PEERDNS="yes"
+IPV6INIT="yes"
+PERSISTENT_DHCLIENT="1"
+EOF
+
+
+# Kernel/cleaning stuff
+cat <<EOL > /mnt/sysimage/etc/sysconfig/kernel
+# UPDATEDEFAULT specifies if new-kernel-pkg should make
+# new kernels the default
+UPDATEDEFAULT=yes
+
+# DEFAULTKERNEL specifies the default kernel package type
+DEFAULTKERNEL=kernel
+EOL
+
+echo "RUN_FIRSTBOOT=NO" > /mnt/sysimage/etc/sysconfig/firstboot
+
+if ! grep -q growpart /mnt/sysimage/etc/cloud/cloud.cfg; then
+  sed -i 's/ - resizefs/ - growpart\n - resizefs/' /mnt/sysimage/etc/cloud/cloud.cfg
+fi
+# temporary until cloud-init 22.2
+sed -i 's/^system_info:/locale: C.UTF-8\nsystem_info:/' /mnt/sysimage/etc/cloud/cloud.cfg
+
+# for regen on boot
+rm -f /mnt/sysimage/var/lib/systemd/random-seed
+cat /dev/null > /mnt/sysimage/etc/machine-id
+find /mnt/sysimage/var/log -type f -exec truncate --size=0 {} \;
+rm -rf /mnt/sysimage/tmp/* /mnt/sysimage/var/tmp/*
+
+# cloud-init
+cat <<EOL > /mnt/sysimage/etc/cloud/cloud.cfg.d/99-vmware-guest-customization.cfg
+disable_vmware_customization: false
+datasource:
+  VMware:
+    vmware_cust_file_max_wait: 10
+EOL
+echo 'genclo' > /mnt/sysimage/etc/yum/vars/infra
+
+true
 %end
+
+shutdown

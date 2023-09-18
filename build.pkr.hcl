@@ -1,22 +1,28 @@
 source "vmware-iso" "base" {
-  cpus      = 1
-  memory    = 2048
-  cores     = 2
-  version   = 19
-  disk_size = 5000
-
+  cpus         = 1
+  memory       = 2048
+  cores        = 2
+  version      = 19
+  disk_size    = var.disk_size * 1000
+  disk_type_id = "thin"
 
   remote_host         = "${var.esxi_host}"
+  remote_port         = 22
   insecure_connection = var.esxi_insecure
   remote_username     = "${var.esxi_user}"
   remote_password     = "${var.esxi_password}"
   remote_type         = "esx5"
-  remote_port         = 22
-  remote_datastore    = "${var.datastore}"
 
-  shutdown_command = "sudo -E sh -c 'userdel -rf packer; rm /etc/sudoers.d/90-cloud-init-users; rm /etc/sudoers.d/packer; /sbin/shutdown -hP now'"
-  ssh_username     = "packer"
-  ssh_password     = "packer"
+  communicator = "ssh"
+  ssh_username = "${var.esxi_user}"
+  ssh_password = "${var.esxi_password}"
+  ssh_host     = "${var.esxi_host}"
+
+
+  http_port_min    = var.http_port_min
+  http_port_max    = var.http_port_max
+  remote_datastore = "${var.datastore}"
+  shutdown_command = "VM_ID=$(vim-cmd vmsvc/getallvms | awk '/{{ .Name }}/{ print $1 }');vim-cmd vmsvc/power.getstate $VM_ID | grep 'Powered on' && vim-cmd power.off $VM_ID; exit"
   ssh_timeout      = "10m"
   network          = "${var.network}"
   network_name     = "${var.network_name}"
@@ -32,10 +38,11 @@ build {
     labels   = ["vmware-iso.base"]
     content {
       name                    = source.key
+      vm_name                 = source.key
       iso_url                 = source.value.iso_url
       iso_checksum            = source.value.iso_checksum
       guest_os_type           = source.value.guest_os_type
-      remote_output_directory = "images/${source.value.remote_output_directory}"
+      remote_output_directory = "base/${source.value.remote_output_directory}"
       boot_command            = source.value.boot_cmd
       http_content = {
         "/preseed" = file(source.value.ks)
@@ -43,13 +50,10 @@ build {
     }
   }
 
-  provisioner "file" {
-    source = "./files/cloudinit.yml"
-    destination = "/tmp/99-vmware-guest-customization.cfg"
-  }
-
   provisioner "shell" {
-    execute_command = local.run_as_root
-    script = "./files/enable-cloudinit.sh"
+    env = {
+      VM_NAME = source.name
+    }
+    script = "./files/wait.sh"
   }
 }
