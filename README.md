@@ -35,9 +35,12 @@ packer build -var-file=variables.pkrvars.hcl -parallel-builds=1 .
 
 
 ### Running on WSL2
-This will not work without a couple modifications. The port from the host machine will need to be bridge from Windows to WSL. This can be achieved with the following commands
-- `netsh interface portproxy add v4tov4 listenport=8312 listenaddress=0.0.0.0 connectport=8312 connectaddress=<wsl2 addr>`
-- `New-NetFirewallRule -DisplayName "Packer WSL2 Port Bridge" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8312`
+This will not work without a couple modifications. The port from the host machine will need to be bridge from Windows to WSL. This can be achieved with the following commands:
+
+```powershell
+netsh interface portproxy add v4tov4 listenport=8312 listenaddress=0.0.0.0 connectport=8312 connectaddress=<wsl2 addr>
+New-NetFirewallRule -DisplayName "Packer WSL2 Port Bridge" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8312
+```
 
 The port choice doesn't matter, just ensure it matches with the port configuration below
 
@@ -62,7 +65,7 @@ The encoding can be gzip+base64, or base64. That information is stored under the
 - `guestinfo.vendordata.encoding`
 
 ## Example
-If using terraform to manage ESXi resources,s ee [`example/`](example/) folder for an example terraform setup. This assumes the `remote_output_directory` (`base/`) is not changed
+If using terraform to manage ESXi resources, see [`example/`](example/) folder for an example terraform setup. It assumes the `remote_output_directory` (`base/`) is not changed
 
 ### `metadata.yaml`
 ```yaml
