@@ -12,7 +12,7 @@ Currently builds Debian 12 and Rocky Linux 9
 - Open adapter within ESXi to associate the build with
 
 ## Variables File Example
-```hcl2
+```hcl
 esxi_host     = "my.exsi.host"
 esxi_user     = "myuser"
 esxi_password = "mypassword"
@@ -42,7 +42,7 @@ This will not work without a couple modifications. The port from the host machin
 The port choice doesn't matter, just ensure it matches with the port configuration below
 
 Add the following variables to `variables.pkrvars.hcl`
-```hcl2
+```hcl
 http_host     = "<host ip>" # NOT THE WSL2 IP
 http_port_min = 8312
 http_port_max = 8312
@@ -62,9 +62,7 @@ The encoding can be gzip+base64, or base64. That information is stored under the
 - `guestinfo.vendordata.encoding`
 
 ## Example
-If using terraform to manage ESXi resources, here is an example `vsphere_virtual_machine` resource to use the provided packer build. The example also uses a `vsphere_file` resource to automatically copy the file to the destination provided. This assumes the `remote_output_directory` (`base/`) is not changed
-
-See [`example/`](example/) folder for an example terraform setup with the below cloud-config.
+If using terraform to manage ESXi resources,s ee [`example/`](example/) folder for an example terraform setup. This assumes the `remote_output_directory` (`base/`) is not changed
 
 ### `metadata.yaml`
 ```yaml
