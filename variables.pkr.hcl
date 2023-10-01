@@ -58,3 +58,9 @@ variable "http_host" {
   type        = string
   default     = "{{ .HTTPIP }}"
 }
+
+variable "efi" {
+  description = "Use EFI (required for UEFI bios)"
+  type        = bool
+  default     = false
+}

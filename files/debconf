@@ -37,6 +37,48 @@ d-i clock-setup/ntp-server string debian.pool.ntp.org
 
 # B.4.7. Partitioning
 
+%{~ if efi }
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+d-i grub-installer/bootdev string /dev/sda
+d-i partman-auto/disk string /dev/sda
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman-auto/method string lvm
+d-i partman-auto-lvm/new_vg_name string primary
+d-i partman-auto-lvm/guided_size string max
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-efi/non_efi_system boolean true
+d-i partman-auto/choose_recipe select fling-the-bling
+d-i partman-auto/expert_recipe string fling-the-bling :: \
+  1 1 1 free \
+    $bios_boot{ } method{ biosgrub } \
+  . \
+  256 256 256 fat32 \
+    $primary{ } $lvmignore{ } \
+    method{ efi } format{ } \
+  . \
+  100% 200% 200% linux-swap \
+    $lvmok{ } lv_name{ swap } in_vg{ primary } \
+    method{ swap } format{ } \
+  . \
+  10000 10000 -1 ext4 \
+    $lvmok{ } lv_name{ root } in_vg{ primary } \
+    method{ format } format{ } use_filesystem{ } filesystem{ ext4 } \
+    mountpoint{ / } \
+  . \
+.                                                    \
+
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+%{~ else }
 d-i partman-auto/disk string /dev/sda
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
@@ -44,11 +86,7 @@ d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 d-i partman/confirm_nooverwrite boolean true
-
-# B.4.7.3. Controlling how partitions are mounted
-
-d-i partman/mount_style select uuid
-
+%{~ endif }
 # B.4.8. Base system installation
 
 d-i base-installer/kernel/image string linux-image-amd64
@@ -58,6 +96,7 @@ d-i base-installer/kernel/image string linux-image-amd64
 d-i apt-setup/non-free boolean true
 d-i apt-setup/contrib boolean true
 d-i apt-setup/disable-cdrom-entries boolean true
+d-i apt-setup/cdrom/set-first boolean false
 d-i apt-setup/services-select multiselect security, updates, contrib, non-free
 # d-i apt-setup/security_host string security.debian.org
 d-i debian-installer/allow_unauthenticated boolean false
@@ -70,9 +109,10 @@ d-i pkgsel/upgrade select full-upgrade
 popularity-contest popularity-contest/participate boolean false
 
 # B.4.11. Boot loader installation
-
+grub-pc grub-pc/install_devices string /dev/sda
 d-i grub-installer/only_debian boolean true
-d-i grub-installer/bootdev string /dev/sda
+
+d-i grub-installer/with_other_os boolean true
 
 # B.4.12. Finishing up the installation
 
@@ -88,7 +128,6 @@ in-target apt-get -y purge installation-report; \
 in-target vmware-toolbox-cmd config set deployPkg enable-custom-scripts true; \
 in-target apt-get update; \
 in-target systemctl enable cloud-init cloud-config cloud-final vmtoolsd sshd; \
-in-target apt dist-upgrade -y; \
 in-target apt clean; \
 in-target userdel -rf packer; \
 in-target sed -i '/^#NAutoVTs=.*/NAutoVTs=0' /etc/systemd/logind.conf; \
@@ -116,4 +155,5 @@ in-target rm -rf /tmp/* /var/tmp/*; \
 >>/target/etc/network/interfaces echo "auto lo"; \
 >>/target/etc/network/interfaces echo "iface lo inet loopback"; \
 >>/target/etc/network/interfaces echo "allow-hotplug eth0"; \
+%{~ if efi ~}>>/target/boot/efi/startup.nsh echo "FS0:\\EFI\\debian\\grubx64.efi"; %{~ endif ~}\
 >>/target/etc/network/interfaces echo "iface eth0 inet dhcp";

@@ -5,6 +5,7 @@ source "vmware-iso" "base" {
   version      = 19
   disk_size    = var.disk_size * 1000
   disk_type_id = "thin"
+  boot_wait    = var.efi ? "5s" : "10s"
 
   remote_host         = "${var.esxi_host}"
   remote_port         = 22
@@ -26,6 +27,7 @@ source "vmware-iso" "base" {
   ssh_timeout      = "10m"
   network          = "${var.network}"
   network_name     = "${var.network_name}"
+  vmx_data         = var.efi ? { "firmware" = "efi" } : {}
 
   vnc_over_websocket = true
   skip_export        = true
@@ -44,8 +46,9 @@ build {
       guest_os_type           = source.value.guest_os_type
       remote_output_directory = "base/${source.value.remote_output_directory}"
       boot_command            = source.value.boot_cmd
+
       http_content = {
-        "/preseed" = file(source.value.ks)
+        "/preseed" = templatefile(source.value.ks, { efi = var.efi })
       }
     }
   }
