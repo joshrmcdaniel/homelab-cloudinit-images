@@ -1,3 +1,12 @@
+packer {
+  required_plugins {
+    vmware = {
+      version = ">= 1.0.8"
+      source  = "github.com/hashicorp/vmware"
+    }
+  }
+}
+
 variable "esxi_host" {
   description = "FQDN of the ESXi Host."
   type        = string
@@ -64,7 +73,6 @@ variable "efi" {
   type        = bool
   default     = false
 }
-
 
 source "vmware-iso" "base" {
   cpus         = 1
